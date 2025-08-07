@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Story Mode</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <button id="start">Start Story</button>
+  <div id="story"></div>
+  <div id="choices"></div>
+  <script>
+    const userId = Date.now().toString();
+    async function start() {
+      const res = await fetch(`/story/start?user_id=${userId}`);
+      const data = await res.json();
+      render(data);
+    }
+    async function choose(choice) {
+      const res = await fetch('/story/choice', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({user_id: userId, choice})
+      });
+      const data = await res.json();
+      render(data);
+    }
+    function render(data) {
+      document.getElementById('story').textContent = data.text;
+      const choicesDiv = document.getElementById('choices');
+      choicesDiv.innerHTML = '';
+      (data.choices || []).forEach(c => {
+        const btn = document.createElement('button');
+        btn.textContent = c;
+        btn.onclick = () => choose(c);
+        choicesDiv.appendChild(btn);
+      });
+    }
+    document.getElementById('start').onclick = start;
+  </script>
+</body>
+</html>

@@ -50,6 +50,7 @@ from utils.config import (
     schedule_lit_check,
     schedule_identity_reflection,
 )
+from utils.story_engine import StorySessionManager
 from utils.resonator import schedule_resonance_creation, create_resonance_now
 import utils.resonator as resonator
 from utils.howru import schedule_howru
@@ -81,6 +82,9 @@ CHAT_HISTORY = {}
 PENDING_DRAFT = {}
 MAX_HISTORY_MESSAGES = 7
 MAX_PROMPT_TOKENS = 8000
+
+# Story sessions
+STORY_MANAGER = StorySessionManager()
 
 # Initialize OpenAI client
 openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -851,9 +855,24 @@ def handle_text_message(msg):
     
     if is_spam(user_id, text):
         return None
-    
+
     if not should_reply_to_message(msg):
         return None
+
+    # Story session commands
+    lower = text.lower()
+    if lower.startswith("/story_start"):
+        result = STORY_MANAGER.start_session(user_id)
+        choices = "\n".join(f"{i+1}. {c}" for i, c in enumerate(result["choices"]))
+        send_telegram_message(chat_id, f"{result['text']}\n\n{choices}", reply_to_message_id=message_id)
+        return result["text"]
+    if lower.startswith("/story_choice"):
+        parts = text.split(maxsplit=1)
+        choice = parts[1] if len(parts) > 1 else ""
+        result = STORY_MANAGER.add_choice(user_id, choice)
+        choices = "\n".join(f"{i+1}. {c}" for i, c in enumerate(result["choices"]))
+        send_telegram_message(chat_id, f"{result['text']}\n\n{choices}", reply_to_message_id=message_id)
+        return result["text"]
 
     # Display voice keyboard on /voice command
     if text.lower().strip() in ("/voice", "voice"):
@@ -890,7 +909,7 @@ def handle_text_message(msg):
                 send_telegram_typing(chat_id)
                 
                 # Search in memory (vectorized files and logs)
-                results = search_memory(query)
+                results = search_memory(query, user_id=user_id)
                 
                 # Now ask SUPPERTIME to process these results
                 if results and not results.startswith("No "):

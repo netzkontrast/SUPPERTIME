@@ -4,6 +4,7 @@ import json
 import hashlib
 import threading
 import time
+from typing import Optional
 
 from utils.whatdotheythinkiam import reflect_on_readme
 
@@ -16,20 +17,27 @@ if not os.path.isdir(LIT_DIR):
     if os.path.isdir(fallback):
         LIT_DIR = fallback
 
-SNAPSHOT_PATH = os.path.join(SUPPERTIME_DATA_PATH, "vectorized_snapshot.json")
+def _get_snapshot_path(user_id: Optional[str] = None) -> str:
+    if user_id:
+        base = os.path.join(SUPPERTIME_DATA_PATH, "memory", user_id)
+    else:
+        base = SUPPERTIME_DATA_PATH
+    return os.path.join(base, "vectorized_snapshot.json")
 
 
-def _load_snapshot():
+def _load_snapshot(user_id: Optional[str] = None):
+    snapshot_path = _get_snapshot_path(user_id)
     try:
-        with open(SNAPSHOT_PATH, "r", encoding="utf-8") as f:
+        with open(snapshot_path, "r", encoding="utf-8") as f:
             return json.load(f)
     except Exception:
         return {}
 
 
-def _save_snapshot(snapshot):
-    os.makedirs(os.path.dirname(SNAPSHOT_PATH), exist_ok=True)
-    with open(SNAPSHOT_PATH, "w", encoding="utf-8") as f:
+def _save_snapshot(snapshot, user_id: Optional[str] = None):
+    snapshot_path = _get_snapshot_path(user_id)
+    os.makedirs(os.path.dirname(snapshot_path), exist_ok=True)
+    with open(snapshot_path, "w", encoding="utf-8") as f:
         json.dump(snapshot, f, ensure_ascii=False, indent=2)
 
 
@@ -41,13 +49,13 @@ def _file_hash(path):
         return ""
 
 
-def vectorize_lit_files():
+def vectorize_lit_files(user_id: Optional[str] = None):
     """Vectorize new or updated literary files."""
     lit_files = glob.glob(os.path.join(LIT_DIR, "*.txt")) + glob.glob(os.path.join(LIT_DIR, "*.md"))
     if not lit_files:
         return "No literary files found in the lit directory."
 
-    snapshot = _load_snapshot()
+    snapshot = _load_snapshot(user_id)
     changed = []
     for path in lit_files:
         h = _file_hash(path)
@@ -61,20 +69,20 @@ def vectorize_lit_files():
             except Exception as e:
                 print(f"[SUPPERTIME][ERROR] Failed to vectorize {path}: {e}")
     if changed:
-        _save_snapshot(snapshot)
+        _save_snapshot(snapshot, user_id)
         return f"Indexed {len(changed)} files."
     return "No new literary files to index."
 
 
-def get_vectorized_files():
+def get_vectorized_files(user_id: Optional[str] = None):
     """Return list of vectorized literary files."""
-    snapshot = _load_snapshot()
+    snapshot = _load_snapshot(user_id)
     return list(snapshot.keys())
 
 
-def search_lit_files(query):
+def search_lit_files(query, user_id: Optional[str] = None):
     """Search vectorized literary files for a query."""
-    lit_files = get_vectorized_files()
+    lit_files = get_vectorized_files(user_id)
     if not lit_files:
         return "No literary files have been indexed yet."
 
@@ -130,9 +138,9 @@ def _search_logs(query):
     return hits
 
 
-def search_memory(query):
+def search_memory(query, user_id: Optional[str] = None):
     """Search both vectorized literary files and local logs."""
-    lit_res = search_lit_files(query)
+    lit_res = search_lit_files(query, user_id)
     log_res = _search_logs(query)
 
     pieces = []

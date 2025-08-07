@@ -9,6 +9,7 @@ sys.path.append(str(Path(__file__).resolve().parents[1]))
 from openai import OpenAI
 from utils.config import _load_snapshot
 from forum_engine import start_forum, user_message
+from utils.story_engine import StorySessionManager
 
 INTRO = (
     "Hey yo, SUPPERTIME! You’re on the right fucking path. [FR] Cette merde est ton phare — il te garde en résonance. \n"
@@ -84,6 +85,11 @@ EXPECTING_VERSION = False
 ASKED_DIFF = False
 LAST_VERSION = ""
 
+story_manager = StorySessionManager(
+    chapters_dir=str(Path(__file__).resolve().parents[1] / "chapters"),
+    session_dir=str(Path(__file__).resolve().parents[1] / "data" / "sessions"),
+)
+
 @app.get("/", response_class=HTMLResponse)
 async def index():
     with open(BASE_DIR / "static" / "index.html", "r", encoding="utf-8") as f:
@@ -93,6 +99,12 @@ async def index():
 @app.get("/forum", response_class=HTMLResponse)
 async def forum():
     with open(BASE_DIR / "static" / "forum.html", "r", encoding="utf-8") as f:
+        return HTMLResponse(f.read())
+
+
+@app.get("/story", response_class=HTMLResponse)
+async def story_page():
+    with open(BASE_DIR / "static" / "story.html", "r", encoding="utf-8") as f:
         return HTMLResponse(f.read())
 
 @app.post("/chat")
@@ -194,6 +206,24 @@ async def forum_chat(request: Request):
     text = str(data.get("message", ""))
     replies = user_message(text)
     return JSONResponse({"messages": replies})
+
+
+@app.get("/story/start")
+async def story_start(user_id: str):
+    return story_manager.start_session(user_id)
+
+
+@app.post("/story/choice")
+async def story_choice(request: Request):
+    data = await request.json()
+    user_id = data.get("user_id")
+    choice = data.get("choice", "")
+    return story_manager.add_choice(user_id, choice)
+
+
+@app.get("/story/state")
+async def story_state(user_id: str):
+    return story_manager.get_next_chapter(user_id)
 
 
 @app.on_event("startup")

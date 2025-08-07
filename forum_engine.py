@@ -47,6 +47,14 @@ MESSAGE_LIMIT = 60  # limit before the forum glitches and resets
 NEW_USER = True
 
 
+def respond_as_character(name: str, history: List[Dict[str, str]]) -> str:
+    """Return a response from a specific character using provided history."""
+    func = AGENTS.get(name)
+    if not func:
+        raise ValueError(f"Unknown agent: {name}")
+    return func(history)
+
+
 def _pick_agents(count: int = 2) -> List[str]:
     return random.sample(list(AGENTS.keys()), k=count)
 
